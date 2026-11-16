@@ -56,7 +56,7 @@ class CheckoutGroup extends Model
         return 'uuid';
     }
 
-    /** Contoh hasil: NXR-261116093045-K7QZ2 (maksimal 40 karakter untuk Midtrans). */
+    /** Contoh hasil: NXR-261116093045-K7QZ2 (22 karakter). */
     public static function generateNumber(): string
     {
         return 'NXR-' . now()->format('ymdHis') . '-' . strtoupper(Str::random(5));
@@ -70,5 +70,11 @@ class CheckoutGroup extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    /** Semua percobaan bayar untuk checkout ini. */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class)->orderBy('attempt');
     }
 }
