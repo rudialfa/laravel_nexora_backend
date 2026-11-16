@@ -97,4 +97,10 @@ class Store extends Model
     {
         return $this->hasMany(Product::class);
     }
+
+    /** Pesanan yang masuk ke toko ini. */
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
 }
