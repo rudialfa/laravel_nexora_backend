@@ -92,4 +92,9 @@ class Store extends Model
         return $this->belongsToMany(User::class, 'store_followers')
             ->withPivot('created_at');
     }
+
+    public function products(): HasMany
+    {
+        return $this->hasMany(Product::class);
+    }
 }

@@ -99,4 +99,11 @@ class User extends Authenticatable
         return $this->belongsToMany(Store::class, 'store_followers')
             ->withPivot('created_at');
     }
+
+    /** Produk favorit (wishlist) pengguna ini. */
+    public function wishlistProducts(): BelongsToMany
+    {
+        return $this->belongsToMany(Product::class, 'wishlists')
+            ->withPivot('created_at');
+    }
 }
