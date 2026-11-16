@@ -5,7 +5,9 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -14,11 +16,10 @@ use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-
+    /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasFactory, HasRoles, HasUuids, Notifiable, SoftDeletes;
 
     /**
-     * Kolom yang boleh diisi massal.
      * "status" sengaja TIDAK ada di sini agar tidak bisa diubah lewat
      * input pengguna; status hanya diubah lewat kode admin.
      *
@@ -56,7 +57,6 @@ class User extends Authenticatable
         ];
     }
 
-    /** Kolom "uuid" diisi otomatis, bukan primary key "id". */
     public function uniqueIds(): array
     {
         return ['uuid'];
@@ -80,5 +80,23 @@ class User extends Authenticatable
     public function activityLogs(): HasMany
     {
         return $this->hasMany(ActivityLog::class);
+    }
+
+    /** Toko milik pengguna ini (maksimal satu). */
+    public function store(): HasOne
+    {
+        return $this->hasOne(Store::class, 'owner_id');
+    }
+
+    public function storeApplications(): HasMany
+    {
+        return $this->hasMany(StoreApplication::class);
+    }
+
+    /** Toko yang diikuti pengguna ini. */
+    public function followedStores(): BelongsToMany
+    {
+        return $this->belongsToMany(Store::class, 'store_followers')
+            ->withPivot('created_at');
     }
 }
