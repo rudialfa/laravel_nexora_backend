@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\PasswordController;
+use App\Http\Controllers\Api\ProfileController;
 use App\Support\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -50,7 +52,22 @@ Route::prefix('v1')->group(function () {
 
     // ---- Route yang wajib login DAN akun aktif ----
     Route::middleware(['auth:sanctum', 'active'])->group(function () {
+
+        // Profil
         Route::get('/me', [AuthController::class, 'me']);
+        Route::patch('/me', [ProfileController::class, 'update']);
+        Route::put('/me/password', [ProfileController::class, 'password'])
+            ->middleware('throttle:5,1,password-change');
+        Route::post('/me/avatar', [ProfileController::class, 'avatar']);
+        Route::delete('/me/avatar', [ProfileController::class, 'destroyAvatar']);
+
+        // Alamat pengiriman (hanya milik pengguna yang login)
+        Route::get('/addresses', [AddressController::class, 'index']);
+        Route::post('/addresses', [AddressController::class, 'store']);
+        Route::get('/addresses/{address}', [AddressController::class, 'show'])->whereUuid('address');
+        Route::patch('/addresses/{address}', [AddressController::class, 'update'])->whereUuid('address');
+        Route::delete('/addresses/{address}', [AddressController::class, 'destroy'])->whereUuid('address');
+        Route::post('/addresses/{address}/default', [AddressController::class, 'makeDefault'])->whereUuid('address');
     });
 
     // ---- Route khusus pengujian, tidak aktif di production ----
