@@ -8,6 +8,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Spatie\Permission\Middleware\RoleMiddleware;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -19,9 +20,12 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
 
-    // Nama pendek untuk dipakai di routes/api.php: ->middleware('active')
+    // Nama pendek untuk dipakai di routes/api.php.
+    //   'active' : akun harus berstatus aktif.
+    //   'role'   : pengguna harus punya salah satu role, contoh role:admin|super_admin
     $middleware->alias([
         'active' => EnsureAccountIsActive::class,
+        'role'   => RoleMiddleware::class,
     ]);
 
     // Nexora adalah API murni dan tidak punya halaman login.

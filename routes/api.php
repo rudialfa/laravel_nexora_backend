@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\StoreApplicationController as AdminStoreApplicationController;
 use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\PasswordController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\StoreApplicationController;
 use App\Support\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -68,6 +70,25 @@ Route::prefix('v1')->group(function () {
         Route::patch('/addresses/{address}', [AddressController::class, 'update'])->whereUuid('address');
         Route::delete('/addresses/{address}', [AddressController::class, 'destroy'])->whereUuid('address');
         Route::post('/addresses/{address}/default', [AddressController::class, 'makeDefault'])->whereUuid('address');
+
+        // Pengajuan toko (pembeli): maksimal 5 permintaan per jam per pengguna
+        Route::get('/store-applications', [StoreApplicationController::class, 'index']);
+        Route::post('/store-applications', [StoreApplicationController::class, 'store'])
+            ->middleware('throttle:5,60,store-application');
+
+        // ---- Khusus admin ----
+        Route::prefix('admin')->middleware('role:admin|super_admin')->group(function () {
+            Route::get('/store-applications', [AdminStoreApplicationController::class, 'index']);
+            Route::get('/store-applications/{application}', [AdminStoreApplicationController::class, 'show'])
+                ->whereUuid('application');
+            Route::get('/store-applications/{application}/photos/{type}', [AdminStoreApplicationController::class, 'photo'])
+                ->whereUuid('application')
+                ->where('type', 'id|selfie');
+            Route::post('/store-applications/{application}/approve', [AdminStoreApplicationController::class, 'approve'])
+                ->whereUuid('application');
+            Route::post('/store-applications/{application}/reject', [AdminStoreApplicationController::class, 'reject'])
+                ->whereUuid('application');
+        });
     });
 
     // ---- Route khusus pengujian, tidak aktif di production ----
