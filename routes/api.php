@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\EmailVerificationController;
+use App\Http\Controllers\Api\PasswordController;
 use App\Support\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -27,6 +29,20 @@ Route::prefix('v1')->group(function () {
     Route::prefix('auth')->group(function () {
         Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
         Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+
+        // Lupa dan reset password (publik, dibatasi).
+        Route::post('/forgot-password', [PasswordController::class, 'forgot'])->middleware('throttle:password');
+        Route::post('/reset-password', [PasswordController::class, 'reset'])->middleware('throttle:password');
+
+        // Verifikasi email. Tautan di email bertanda tangan digital (middleware "signed").
+        Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
+            ->whereUuid('id')
+            ->where('hash', '[a-f0-9]{40}')
+            ->middleware('signed')
+            ->name('verification.verify');
+
+        Route::post('/email/verification-notification', [EmailVerificationController::class, 'send'])
+            ->middleware(['auth:sanctum', 'active', 'throttle:verification']);
 
         // Logout boleh dilakukan siapa pun yang tokennya valid, termasuk akun yang sedang diblokir.
         Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');

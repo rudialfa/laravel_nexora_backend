@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\NewAccessToken;
 use Laravel\Sanctum\PersonalAccessToken;
+use Throwable;
 
 class AuthService
 {
@@ -20,22 +21,43 @@ class AuthService
     public const DEFAULT_DEVICE_NAME = 'mobile';
 
     /**
-     * Membuat akun baru dengan role customer.
+     * Membuat akun baru dengan role customer, lalu mengirim email verifikasi.
      * Hanya name, email, phone, dan password yang diambil; kolom lain
      * (status, role, dan sebagainya) tidak pernah berasal dari input pengguna.
+     *
+     * Email dikirim SETELAH akun tersimpan. Jika pengiriman gagal, pendaftaran
+     * tetap berhasil dan pengguna bisa meminta kirim ulang.
      *
      * @param  array<string, mixed>  $data
      */
     public function register(array $data, Request $request): User
     {
-        return DB::transaction(function () use ($data, $request) {
+        $user = DB::transaction(function () use ($data, $request) {
             $user = User::create(Arr::only($data, ['name', 'email', 'phone', 'password']));
             $user->assignRole('customer');
 
-            $this->log($user->id, 'auth.register', $request);
+            $this->record($user->id, 'auth.register', $request);
 
             return $user;
         });
+
+        $this->sendVerificationEmail($user);
+
+        return $user;
+    }
+
+    /** Mengirim email verifikasi. Mengembalikan false (dan mencatat error) jika gagal. */
+    public function sendVerificationEmail(User $user): bool
+    {
+        try {
+            $user->sendEmailVerificationNotification();
+
+            return true;
+        } catch (Throwable $e) {
+            report($e);
+
+            return false;
+        }
     }
 
     /**
@@ -61,13 +83,13 @@ class AuthService
         }
 
         if (! Hash::check($password, $user->password)) {
-            $this->log($user->id, 'auth.login_failed', $request);
+            $this->record($user->id, 'auth.login_failed', $request);
 
             return null;
         }
 
         if ($user->status !== AccountStatus::ACTIVE) {
-            $this->log($user->id, 'auth.login_blocked', $request, ['status' => $user->status]);
+            $this->record($user->id, 'auth.login_blocked', $request, ['status' => $user->status]);
 
             throw new AccountInactiveException;
         }
@@ -78,7 +100,7 @@ class AuthService
 
         $user->forceFill(['last_login_at' => now()])->save();
 
-        $this->log($user->id, 'auth.login', $request);
+        $this->record($user->id, 'auth.login', $request);
 
         return $user;
     }
@@ -102,11 +124,15 @@ class AuthService
             $token->delete();
         }
 
-        $this->log($user->id, 'auth.logout', $request);
+        $this->record($user->id, 'auth.logout', $request);
     }
 
-    /** @param  array<string, mixed>|null  $properties */
-    private function log(?int $userId, string $action, Request $request, ?array $properties = null): void
+    /**
+     * Mencatat aktivitas ke activity_logs (siapa, apa, dari IP mana).
+     *
+     * @param  array<string, mixed>|null  $properties
+     */
+    public function record(?int $userId, string $action, Request $request, ?array $properties = null): void
     {
         ActivityLog::create([
             'user_id'    => $userId,
