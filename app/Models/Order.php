@@ -172,6 +172,22 @@ class Order extends Model
         return $this->hasOne(Shipment::class);
     }
 
+    public function disputes(): HasMany
+    {
+        return $this->hasMany(Dispute::class);
+    }
+
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(Refund::class);
+    }
+
+    /** Ulasan toko untuk pesanan ini (maksimal satu). */
+    public function storeReview(): HasOne
+    {
+        return $this->hasOne(StoreReview::class);
+    }
+
     /** Apakah aktor ini boleh memindahkan pesanan ke status tersebut (dari status saat ini)? */
     public function canTransitionTo(string $to, string $actor): bool
     {

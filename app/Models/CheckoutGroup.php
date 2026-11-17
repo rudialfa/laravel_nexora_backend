@@ -77,4 +77,10 @@ class CheckoutGroup extends Model
     {
         return $this->hasMany(Payment::class)->orderBy('attempt');
     }
+
+    /** Voucher yang dipasang pada checkout ini. */
+    public function voucherUsages(): HasMany
+    {
+        return $this->hasMany(VoucherUsage::class);
+    }
 }

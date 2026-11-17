@@ -91,6 +91,22 @@ class Product extends Model
             ->withPivot('created_at');
     }
 
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(ProductReview::class);
+    }
+
+    public function questions(): HasMany
+    {
+        return $this->hasMany(ProductQuestion::class);
+    }
+
+    /** Item pesanan yang berisi produk ini. */
+    public function orderItems(): HasMany
+    {
+        return $this->hasMany(OrderItem::class);
+    }
+
     /**
      * Menghitung ulang rentang harga (price_min dan price_max)
      * dari varian aktif, memakai harga efektif (setelah diskon).

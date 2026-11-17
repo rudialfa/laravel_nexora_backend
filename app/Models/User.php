@@ -122,4 +122,41 @@ class User extends Authenticatable
     {
         return $this->hasMany(Order::class);
     }
+
+    public function productReviews(): HasMany
+    {
+        return $this->hasMany(ProductReview::class);
+    }
+
+    public function storeReviews(): HasMany
+    {
+        return $this->hasMany(StoreReview::class);
+    }
+
+    public function productQuestions(): HasMany
+    {
+        return $this->hasMany(ProductQuestion::class);
+    }
+
+    /** Percakapan chat sebagai pembeli. */
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(Conversation::class, 'user_id');
+    }
+
+    /** Komplain yang diajukan pengguna ini sebagai pembeli. */
+    public function disputes(): HasMany
+    {
+        return $this->hasMany(Dispute::class, 'user_id');
+    }
+
+    public function voucherUsages(): HasMany
+    {
+        return $this->hasMany(VoucherUsage::class);
+    }
+
+    public function notificationSettings(): HasMany
+    {
+        return $this->hasMany(NotificationSetting::class);
+    }
 }
