@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureAccountIsActive;
 use App\Support\ApiResponse;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -18,13 +19,18 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
 
-        // Nexora adalah API murni dan tidak punya halaman login.
-        // Untuk /api/* jangan mengalihkan tamu ke route "login" (tidak ada),
-        // cukup lempar error 401 yang diubah menjadi JSON di bawah.
-        $middleware->redirectGuestsTo(
-            fn(Request $request) => $request->is('api/*') ? null : '/'
+    // Nama pendek untuk dipakai di routes/api.php: ->middleware('active')
+    $middleware->alias([
+        'active' => EnsureAccountIsActive::class,
+    ]);
+
+    // Nexora adalah API murni dan tidak punya halaman login.
+    // Untuk /api/* jangan mengalihkan tamu ke route "login" (tidak ada),
+    // cukup lempar error 401 yang diubah menjadi JSON di bawah.
+    $middleware->redirectGuestsTo(
+        fn(Request $request) => $request->is('api/*') ? null : '/'
         );
-    })
+})
     ->withExceptions(function (Exceptions $exceptions): void {
 
         // Semua alamat /api/* selalu dijawab dengan JSON,
@@ -54,8 +60,9 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
-        // 403, 404, 405, 429, dan error HTTP lainnya.
-        $exceptions->render(function (HttpExceptionInterface $e, Request $request) {
+    // 403, 404, 405, 429, dan error HTTP lainnya.
+    // Header bawaan exception (misalnya Retry-After pada 429) ikut diteruskan.
+    $exceptions->render(function (HttpExceptionInterface $e, Request $request) {
             if ($request->is('api/*')) {
                 $status = $e->getStatusCode();
 
@@ -67,7 +74,7 @@ return Application::configure(basePath: dirname(__DIR__))
                     default => $e->getMessage() ?: 'Terjadi kesalahan.',
                 };
 
-                return ApiResponse::error($message, $status);
+            return ApiResponse::error($message, $status)->withHeaders($e->getHeaders());
             }
         });
 
@@ -79,7 +86,7 @@ return Application::configure(basePath: dirname(__DIR__))
                     ? ['debug' => [
                         'exception' => get_class($e),
                         'message'   => $e->getMessage(),
-                        'file'      => $e->getFile() . ':' . $e->getLine(),
+                'file'      => $e->getFile() . ':' . $e->getLine(),
                     ]]
                     : [];
 

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AuthController;
 use App\Support\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -22,9 +23,18 @@ Route::prefix('v1')->group(function () {
         ], 'Nexora API berjalan');
     });
 
-    // Route terproteksi: wajib token Sanctum yang valid (sementara, untuk uji).
-    Route::middleware('auth:sanctum')->get('/me', function (Request $request) {
-        return ApiResponse::success($request->user());
+    // ---- Autentikasi ----
+    Route::prefix('auth')->group(function () {
+        Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
+        Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+
+        // Logout boleh dilakukan siapa pun yang tokennya valid, termasuk akun yang sedang diblokir.
+        Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+    });
+
+    // ---- Route yang wajib login DAN akun aktif ----
+    Route::middleware(['auth:sanctum', 'active'])->group(function () {
+        Route::get('/me', [AuthController::class, 'me']);
     });
 
     // ---- Route khusus pengujian, tidak aktif di production ----
