@@ -3,11 +3,14 @@
 namespace App\Models;
 
 use DomainException;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StoreBankAccount extends Model
 {
+    use HasUuids;
+
     /** store_id ditentukan server dari toko yang sedang login. */
     protected $fillable = ['bank_code', 'bank_name', 'account_name', 'is_default'];
 
@@ -21,6 +24,16 @@ class StoreBankAccount extends Model
             'account_number_encrypted' => 'encrypted',
             'is_default'               => 'boolean',
         ];
+    }
+
+    public function uniqueIds(): array
+    {
+        return ['uuid'];
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
     }
 
     public function store(): BelongsTo

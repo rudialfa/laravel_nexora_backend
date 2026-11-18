@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureAccountIsActive;
+use App\Http\Middleware\ResolveSellerStore;
 use App\Support\ApiResponse;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -21,11 +22,14 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
 
     // Nama pendek untuk dipakai di routes/api.php.
-    //   'active' : akun harus berstatus aktif.
-    //   'role'   : pengguna harus punya salah satu role, contoh role:admin|super_admin
+    //   'active'       : akun harus berstatus aktif.
+    //   'role'         : pengguna harus punya salah satu role, contoh role:admin|super_admin
+    //   'seller.store' : menyiapkan toko milik seller yang login (404 jika tidak punya);
+    //                    seller.store:editable juga menolak toko yang tidak aktif.
     $middleware->alias([
-        'active' => EnsureAccountIsActive::class,
-        'role'   => RoleMiddleware::class,
+        'active'       => EnsureAccountIsActive::class,
+        'role'         => RoleMiddleware::class,
+        'seller.store' => ResolveSellerStore::class,
     ]);
 
     // Nexora adalah API murni dan tidak punya halaman login.

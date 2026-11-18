@@ -1,0 +1,25 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('store_bank_accounts', function (Blueprint $table) {
+            // ID publik. nullable hanya agar migration aman pada tabel yang sudah ada;
+            // model (HasUuids) selalu mengisinya otomatis.
+            $table->uuid('uuid')->nullable()->unique()->after('id');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('store_bank_accounts', function (Blueprint $table) {
+            $table->dropUnique(['uuid']);
+            $table->dropColumn('uuid');
+        });
+    }
+};

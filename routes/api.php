@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\PasswordController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\Seller\BankAccountController as SellerBankAccountController;
+use App\Http\Controllers\Api\Seller\StoreController as SellerStoreController;
 use App\Http\Controllers\Api\StoreApplicationController;
 use App\Support\ApiResponse;
 use Illuminate\Http\Request;
@@ -75,6 +77,31 @@ Route::prefix('v1')->group(function () {
         Route::get('/store-applications', [StoreApplicationController::class, 'index']);
         Route::post('/store-applications', [StoreApplicationController::class, 'store'])
             ->middleware('throttle:5,60,store-application');
+
+        // ---- Khusus seller: hanya menyentuh toko milik sendiri ----
+        // seller.store        : boleh melihat walau toko ditangguhkan/ditutup
+        // seller.store:editable : hanya jika toko berstatus aktif (semua perubahan)
+        Route::prefix('seller/store')->middleware('role:seller')->group(function () {
+            Route::get('/', [SellerStoreController::class, 'show'])->middleware('seller.store');
+            Route::patch('/', [SellerStoreController::class, 'update'])->middleware('seller.store:editable');
+
+            Route::post('/images/{type}', [SellerStoreController::class, 'uploadImage'])
+                ->where('type', 'logo|banner')
+                ->middleware(['seller.store:editable', 'throttle:10,1,store-image']);
+            Route::delete('/images/{type}', [SellerStoreController::class, 'removeImage'])
+                ->where('type', 'logo|banner')
+                ->middleware('seller.store:editable');
+
+            Route::put('/operating-hours', [SellerStoreController::class, 'updateHours'])->middleware('seller.store:editable');
+            Route::put('/couriers', [SellerStoreController::class, 'updateCouriers'])->middleware('seller.store:editable');
+
+            Route::get('/bank-accounts', [SellerBankAccountController::class, 'index'])->middleware('seller.store');
+            Route::post('/bank-accounts', [SellerBankAccountController::class, 'store'])->middleware('seller.store:editable');
+            Route::delete('/bank-accounts/{account}', [SellerBankAccountController::class, 'destroy'])
+                ->whereUuid('account')->middleware('seller.store:editable');
+            Route::post('/bank-accounts/{account}/default', [SellerBankAccountController::class, 'makeDefault'])
+                ->whereUuid('account')->middleware('seller.store:editable');
+        });
 
         // ---- Khusus admin ----
         Route::prefix('admin')->middleware('role:admin|super_admin')->group(function () {
