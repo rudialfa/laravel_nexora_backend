@@ -1,8 +1,12 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\BrandController as AdminBrandController;
+use App\Http\Controllers\Api\Admin\CategoryController as AdminCategoryController;
 use App\Http\Controllers\Api\Admin\StoreApplicationController as AdminStoreApplicationController;
 use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BrandController;
+use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\PasswordController;
 use App\Http\Controllers\Api\ProfileController;
@@ -29,6 +33,13 @@ Route::prefix('v1')->group(function () {
             'app'  => config('app.name'),
             'time' => now()->toIso8601String(),
         ], 'Nexora API berjalan');
+    });
+
+    // ---- Katalog publik (tanpa login), maksimal 120 permintaan per menit per alamat IP ----
+    Route::middleware('throttle:120,1,catalog')->group(function () {
+        Route::get('/categories', [CategoryController::class, 'index']);
+        Route::get('/categories/{slug}', [CategoryController::class, 'show'])->where('slug', '[a-z0-9\-]+');
+        Route::get('/brands', [BrandController::class, 'index']);
     });
 
     // ---- Autentikasi ----
@@ -79,7 +90,7 @@ Route::prefix('v1')->group(function () {
             ->middleware('throttle:5,60,store-application');
 
         // ---- Khusus seller: hanya menyentuh toko milik sendiri ----
-        // seller.store        : boleh melihat walau toko ditangguhkan/ditutup
+        // seller.store          : boleh melihat walau toko ditangguhkan/ditutup
         // seller.store:editable : hanya jika toko berstatus aktif (semua perubahan)
         Route::prefix('seller/store')->middleware('role:seller')->group(function () {
             Route::get('/', [SellerStoreController::class, 'show'])->middleware('seller.store');
@@ -105,6 +116,8 @@ Route::prefix('v1')->group(function () {
 
         // ---- Khusus admin ----
         Route::prefix('admin')->middleware('role:admin|super_admin')->group(function () {
+
+            // Pengajuan toko
             Route::get('/store-applications', [AdminStoreApplicationController::class, 'index']);
             Route::get('/store-applications/{application}', [AdminStoreApplicationController::class, 'show'])
                 ->whereUuid('application');
@@ -115,6 +128,29 @@ Route::prefix('v1')->group(function () {
                 ->whereUuid('application');
             Route::post('/store-applications/{application}/reject', [AdminStoreApplicationController::class, 'reject'])
                 ->whereUuid('application');
+
+            // Kategori
+            Route::get('/categories', [AdminCategoryController::class, 'index']);
+            Route::post('/categories', [AdminCategoryController::class, 'store']);
+            Route::patch('/categories/{category}', [AdminCategoryController::class, 'update'])->whereUuid('category');
+            Route::delete('/categories/{category}', [AdminCategoryController::class, 'destroy'])->whereUuid('category');
+            Route::post('/categories/{category}/images/{type}', [AdminCategoryController::class, 'uploadImage'])
+                ->whereUuid('category')
+                ->where('type', 'icon|image')
+                ->middleware('throttle:20,1,catalog-image');
+            Route::delete('/categories/{category}/images/{type}', [AdminCategoryController::class, 'removeImage'])
+                ->whereUuid('category')
+                ->where('type', 'icon|image');
+
+            // Brand
+            Route::get('/brands', [AdminBrandController::class, 'index']);
+            Route::post('/brands', [AdminBrandController::class, 'store']);
+            Route::patch('/brands/{brand}', [AdminBrandController::class, 'update'])->whereUuid('brand');
+            Route::delete('/brands/{brand}', [AdminBrandController::class, 'destroy'])->whereUuid('brand');
+            Route::post('/brands/{brand}/logo', [AdminBrandController::class, 'uploadLogo'])
+                ->whereUuid('brand')
+                ->middleware('throttle:20,1,catalog-image');
+            Route::delete('/brands/{brand}/logo', [AdminBrandController::class, 'removeLogo'])->whereUuid('brand');
         });
     });
 
