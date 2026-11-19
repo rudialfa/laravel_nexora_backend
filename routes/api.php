@@ -8,9 +8,11 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\EmailVerificationController;
+use App\Http\Controllers\Api\HomeController;
 use App\Http\Controllers\Api\PasswordController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\PublicStoreController;
 use App\Http\Controllers\Api\Seller\BankAccountController as SellerBankAccountController;
 use App\Http\Controllers\Api\Seller\ProductController as SellerProductController;
 use App\Http\Controllers\Api\Seller\ProductVariantController as SellerProductVariantController;
@@ -40,10 +42,17 @@ Route::prefix('v1')->group(function () {
 
     // ---- Katalog publik (tanpa login), maksimal 120 permintaan per menit per alamat IP ----
     Route::middleware('throttle:120,1,catalog')->group(function () {
+        Route::get('/home', [HomeController::class, 'index']);
+
         Route::get('/categories', [CategoryController::class, 'index']);
         Route::get('/categories/{slug}', [CategoryController::class, 'show'])->where('slug', '[a-z0-9\-]+');
         Route::get('/brands', [BrandController::class, 'index']);
+
+        Route::get('/products', [ProductController::class, 'index']);
         Route::get('/products/{slug}', [ProductController::class, 'show'])->where('slug', '[a-z0-9\-]+');
+        Route::get('/products/{slug}/related', [ProductController::class, 'related'])->where('slug', '[a-z0-9\-]+');
+
+        Route::get('/stores/{slug}', [PublicStoreController::class, 'show'])->where('slug', '[a-z0-9\-]+');
     });
 
     // ---- Autentikasi ----
