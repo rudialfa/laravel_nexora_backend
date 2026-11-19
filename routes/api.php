@@ -9,8 +9,11 @@ use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\PasswordController;
+use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\Seller\BankAccountController as SellerBankAccountController;
+use App\Http\Controllers\Api\Seller\ProductController as SellerProductController;
+use App\Http\Controllers\Api\Seller\ProductVariantController as SellerProductVariantController;
 use App\Http\Controllers\Api\Seller\StoreController as SellerStoreController;
 use App\Http\Controllers\Api\StoreApplicationController;
 use App\Support\ApiResponse;
@@ -40,6 +43,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/categories', [CategoryController::class, 'index']);
         Route::get('/categories/{slug}', [CategoryController::class, 'show'])->where('slug', '[a-z0-9\-]+');
         Route::get('/brands', [BrandController::class, 'index']);
+        Route::get('/products/{slug}', [ProductController::class, 'show'])->where('slug', '[a-z0-9\-]+');
     });
 
     // ---- Autentikasi ----
@@ -112,6 +116,37 @@ Route::prefix('v1')->group(function () {
                 ->whereUuid('account')->middleware('seller.store:editable');
             Route::post('/bank-accounts/{account}/default', [SellerBankAccountController::class, 'makeDefault'])
                 ->whereUuid('account')->middleware('seller.store:editable');
+        });
+
+        // ---- Khusus seller: produk milik tokonya sendiri ----
+        Route::prefix('seller/products')->middleware('role:seller')->group(function () {
+            Route::get('/', [SellerProductController::class, 'index'])->middleware('seller.store');
+            Route::get('/{product}', [SellerProductController::class, 'show'])
+                ->whereUuid('product')->middleware('seller.store');
+
+            // Semua perubahan: toko harus aktif, maksimal 60 permintaan per menit per pengguna
+            Route::middleware(['seller.store:editable', 'throttle:60,1,seller-catalog'])->group(function () {
+                Route::post('/', [SellerProductController::class, 'store']);
+                Route::patch('/{product}', [SellerProductController::class, 'update'])->whereUuid('product');
+                Route::delete('/{product}', [SellerProductController::class, 'destroy'])->whereUuid('product');
+                Route::post('/{product}/publish', [SellerProductController::class, 'publish'])->whereUuid('product');
+                Route::post('/{product}/unpublish', [SellerProductController::class, 'unpublish'])->whereUuid('product');
+
+                Route::post('/{product}/images', [SellerProductController::class, 'uploadImage'])
+                    ->whereUuid('product')
+                    ->middleware('throttle:20,1,product-image');
+                Route::delete('/{product}/images/{image}', [SellerProductController::class, 'destroyImage'])
+                    ->whereUuid(['product', 'image']);
+
+                Route::post('/{product}/variants', [SellerProductVariantController::class, 'store'])
+                    ->whereUuid('product');
+                Route::patch('/{product}/variants/{variant}', [SellerProductVariantController::class, 'update'])
+                    ->whereUuid(['product', 'variant']);
+                Route::delete('/{product}/variants/{variant}', [SellerProductVariantController::class, 'destroy'])
+                    ->whereUuid(['product', 'variant']);
+                Route::post('/{product}/variants/{variant}/stock', [SellerProductVariantController::class, 'adjustStock'])
+                    ->whereUuid(['product', 'variant']);
+            });
         });
 
         // ---- Khusus admin ----
