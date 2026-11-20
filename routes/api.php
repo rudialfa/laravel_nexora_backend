@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Admin\StoreApplicationController as AdminStoreAppli
 use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandController;
+use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\HomeController;
@@ -96,6 +97,16 @@ Route::prefix('v1')->group(function () {
         Route::patch('/addresses/{address}', [AddressController::class, 'update'])->whereUuid('address');
         Route::delete('/addresses/{address}', [AddressController::class, 'destroy'])->whereUuid('address');
         Route::post('/addresses/{address}/default', [AddressController::class, 'makeDefault'])->whereUuid('address');
+
+        // Keranjang belanja: hanya milik pengguna yang login, maksimal 120 permintaan per menit
+        Route::prefix('cart')->middleware('throttle:120,1,cart')->group(function () {
+            Route::get('/', [CartController::class, 'index']);
+            Route::delete('/', [CartController::class, 'clear']);
+            Route::post('/items', [CartController::class, 'store']);
+            Route::patch('/items/{variant}', [CartController::class, 'update'])->whereUuid('variant');
+            Route::delete('/items/{variant}', [CartController::class, 'destroy'])->whereUuid('variant');
+            Route::post('/select', [CartController::class, 'select']);
+        });
 
         // Pengajuan toko (pembeli): maksimal 5 permintaan per jam per pengguna
         Route::get('/store-applications', [StoreApplicationController::class, 'index']);
