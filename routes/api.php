@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\CartController;
+use App\Http\Controllers\Api\ShippingController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\HomeController;
@@ -97,6 +98,16 @@ Route::prefix('v1')->group(function () {
         Route::patch('/addresses/{address}', [AddressController::class, 'update'])->whereUuid('address');
         Route::delete('/addresses/{address}', [AddressController::class, 'destroy'])->whereUuid('address');
         Route::post('/addresses/{address}/default', [AddressController::class, 'makeDefault'])->whereUuid('address');
+
+        // Cek ongkos kirim (Biteship): maksimal 20 permintaan per menit per pengguna
+        Route::prefix('shipping')->middleware('throttle:20,1,shipping-rates')->group(function () {
+            Route::post('/rates', [ShippingController::class, 'rates']);
+        });
+
+        // Pencarian area pengiriman (Biteship): maksimal 30 permintaan per menit per pengguna
+        Route::prefix('shipping')->middleware('throttle:30,1,shipping')->group(function () {
+            Route::get('/areas', [ShippingController::class, 'areas']);
+        });
 
         // Keranjang belanja: hanya milik pengguna yang login, maksimal 120 permintaan per menit
         Route::prefix('cart')->middleware('throttle:120,1,cart')->group(function () {
