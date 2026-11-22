@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Address;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
@@ -18,6 +19,10 @@ class DemoDataCommand extends Command
     public const SELLER_EMAIL = 'demo-seller@nexora.test';
     public const BUYER_EMAIL  = 'demo-buyer@nexora.test';
     public const PRODUCT_SLUG = 'sepatu-lari-demo';
+
+    // Area ID contoh dari dokumentasi Biteship (Jakarta Selatan). Ganti dengan hasil pencarian area jika perlu.
+    public const AREA_TOKO    = 'IDNP6IDNC148IDND836IDZ12410';
+    public const AREA_PEMBELI = 'IDNP6IDNC148IDND836IDZ12430';
 
     protected $signature = 'nexora:demo-data';
 
@@ -37,6 +42,7 @@ class DemoDataCommand extends Command
         $pembeli = $this->akun(self::BUYER_EMAIL, 'Demo Pembeli', ['customer']);
 
         $toko = $this->toko($penjual);
+        $alamat = $this->alamat($pembeli);
 
         $kategori = Category::firstOrCreate(['slug' => 'demo-olahraga'], ['name' => 'Demo Olahraga']);
         $brand    = Brand::firstOrCreate(['slug' => 'demo-brand'], ['name' => 'Demo Brand']);
@@ -47,6 +53,8 @@ class DemoDataCommand extends Command
         $this->line('Penjual : ' . self::SELLER_EMAIL . ' / ' . self::PASSWORD . '  (toko: ' . $toko->name . ')');
         $this->line('Pembeli : ' . $pembeli->email . ' / ' . self::PASSWORD);
         $this->line('Produk  : ' . $produk->slug . ' (' . $produk->variants()->count() . ' varian, ' . $produk->status . ')');
+
+        $this->line('Alamat  : '.$alamat->label.' (area pembeli '.self::AREA_PEMBELI.', area toko '.self::AREA_TOKO.')');
 
         return self::SUCCESS;
     }
@@ -100,11 +108,37 @@ class DemoDataCommand extends Command
             $toko->restore();
         }
 
-        $toko->forceFill(['status' => 'active', 'is_open' => true])->save();
+        $toko->forceFill(['status' => 'active', 'is_open' => true, 'biteship_area_id' => self::AREA_TOKO])->save();
 
         Wallet::firstOrCreate(['store_id' => $toko->id]);
 
         return $toko->fresh();
+    }
+
+    /** Membuat atau memulihkan satu alamat contoh untuk pembeli, lengkap dengan area ID Biteship. */
+    private function alamat(User $pembeli): Address
+    {
+        $alamat = Address::withTrashed()->where('user_id', $pembeli->id)->where('label', 'Rumah Demo')->first() ?? new Address;
+
+        if ($alamat->trashed()) {
+            $alamat->restore();
+        }
+
+        $alamat->forceFill([
+            'user_id'          => $pembeli->id,
+            'label'            => 'Rumah Demo',
+            'recipient_name'   => 'Demo Pembeli',
+            'phone'            => '628123456780',
+            'province'         => 'DKI Jakarta',
+            'city'             => 'Jakarta Selatan',
+            'district'         => 'Cilandak',
+            'postal_code'      => '12430',
+            'street'           => 'Jl. Contoh Pembeli No. 2',
+            'biteship_area_id' => self::AREA_PEMBELI,
+            'is_default'       => true,
+        ])->save();
+
+        return $alamat->fresh();
     }
 
     private function produk(Store $toko, Category $kategori, Brand $brand): Product

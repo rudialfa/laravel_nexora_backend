@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Console\Commands\DemoDataCommand;
+use App\Models\Address;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
@@ -12,6 +13,7 @@ use App\Models\Store;
 use App\Models\User;
 use App\Models\Wallet;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -56,6 +58,10 @@ class DemoDataCommandTest extends TestCase
         $this->assertSame(1, Product::count());
         $this->assertSame(2, ProductVariant::count());
         $this->assertSame(1, ProductImage::count());
+        $this->assertSame(DemoDataCommand::AREA_TOKO, Store::first()->biteship_area_id);
+        $this->assertSame(1, Address::count());
+        $this->assertSame(DemoDataCommand::AREA_PEMBELI, Address::first()->biteship_area_id);
+        $this->assertSame($pembeli->id, Address::first()->user_id);
         $this->assertSame($penjual->id, Store::first()->owner_id);
 
         $produk = Product::first();
@@ -81,6 +87,33 @@ class DemoDataCommandTest extends TestCase
         $this->withToken($tokenPenjual)
             ->postJson('/api/v1/cart/items', ['variant_id' => $varianId])
             ->assertStatus(422);
+    }
+
+    public function test_data_contoh_siap_untuk_cek_ongkir(): void
+    {
+        Storage::fake('public');
+        config(['biteship.key' => 'test-key', 'biteship.base_url' => 'https://api.biteship.com']);
+        Http::fake(['api.biteship.com/v1/rates/couriers' => Http::response(['success' => true, 'pricing' => [[
+            'courier_code' => 'jne', 'courier_name' => 'JNE',
+            'courier_service_code' => 'reg', 'courier_service_name' => 'Reguler', 'price' => 9000,
+        ]]])]);
+
+        $this->artisan('nexora:demo-data')->assertExitCode(0);
+
+        $varianId = ProductVariant::where('sku', 'DEMO-42')->value('uuid');
+        $token    = $this->masuk(DemoDataCommand::BUYER_EMAIL);
+
+        $this->withToken($token)
+            ->postJson('/api/v1/cart/items', ['variant_id' => $varianId, 'quantity' => 1])
+            ->assertStatus(201);
+
+        $this->withToken($token)
+            ->postJson('/api/v1/shipping/rates', ['store_id' => Store::first()->uuid, 'address_id' => Address::first()->uuid])
+            ->assertOk()
+            ->assertJsonPath('data.options.0.courier_code', 'jne');
+
+        Http::assertSent(fn ($r) => $r['origin_area_id'] === DemoDataCommand::AREA_TOKO
+            && $r['destination_area_id'] === DemoDataCommand::AREA_PEMBELI);
     }
 
     public function test_perintah_menolak_berjalan_di_production(): void
