@@ -84,6 +84,8 @@ class BiteshipService
         $key = config('biteship.key');
 
         if (blank($key)) {
+            Log::warning('Biteship belum dikonfigurasi: BITESHIP_API_KEY kosong.');
+
             throw new BiteshipException('Layanan pengiriman sedang tidak tersedia.', 503, 'not_configured');
         }
 
