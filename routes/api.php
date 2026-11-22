@@ -7,7 +7,10 @@ use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\CartController;
+use App\Http\Controllers\Api\AdminVoucherController;
+use App\Http\Controllers\Api\SellerVoucherController;
 use App\Http\Controllers\Api\ShippingController;
+use App\Http\Controllers\Api\VoucherController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\HomeController;
@@ -107,6 +110,30 @@ Route::prefix('v1')->group(function () {
         // Pencarian area pengiriman (Biteship): maksimal 30 permintaan per menit per pengguna
         Route::prefix('shipping')->middleware('throttle:30,1,shipping')->group(function () {
             Route::get('/areas', [ShippingController::class, 'areas']);
+        });
+
+        // Validasi voucher oleh pembeli: maksimal 20 permintaan per menit per pengguna
+        Route::post('/vouchers/validate', [VoucherController::class, 'check'])->middleware('throttle:20,1,voucher-check');
+
+        // Voucher toko (seller): hanya milik toko sendiri
+        Route::prefix('seller/vouchers')->middleware('role:seller')->group(function () {
+            Route::get('/', [SellerVoucherController::class, 'index'])->middleware('seller.store');
+            Route::get('/{voucher}', [SellerVoucherController::class, 'show'])->whereUuid('voucher')->middleware('seller.store');
+
+            Route::middleware(['seller.store:editable', 'throttle:60,1,seller-vouchers'])->group(function () {
+                Route::post('/', [SellerVoucherController::class, 'store']);
+                Route::patch('/{voucher}', [SellerVoucherController::class, 'update'])->whereUuid('voucher');
+                Route::delete('/{voucher}', [SellerVoucherController::class, 'destroy'])->whereUuid('voucher');
+            });
+        });
+
+        // Voucher platform (admin)
+        Route::prefix('admin/vouchers')->middleware(['role:admin|super_admin', 'throttle:60,1,admin-vouchers'])->group(function () {
+            Route::get('/', [AdminVoucherController::class, 'index']);
+            Route::post('/', [AdminVoucherController::class, 'store']);
+            Route::get('/{voucher}', [AdminVoucherController::class, 'show'])->whereUuid('voucher');
+            Route::patch('/{voucher}', [AdminVoucherController::class, 'update'])->whereUuid('voucher');
+            Route::delete('/{voucher}', [AdminVoucherController::class, 'destroy'])->whereUuid('voucher');
         });
 
         // Keranjang belanja: hanya milik pengguna yang login, maksimal 120 permintaan per menit
