@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\CartController;
+use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\AdminVoucherController;
 use App\Http\Controllers\Api\SellerVoucherController;
 use App\Http\Controllers\Api\ShippingController;
@@ -134,6 +135,13 @@ Route::prefix('v1')->group(function () {
             Route::get('/{voucher}', [AdminVoucherController::class, 'show'])->whereUuid('voucher');
             Route::patch('/{voucher}', [AdminVoucherController::class, 'update'])->whereUuid('voucher');
             Route::delete('/{voucher}', [AdminVoucherController::class, 'destroy'])->whereUuid('voucher');
+        });
+
+        // Checkout: pratinjau, pembuatan pesanan, dan tampilan checkout sendiri
+        Route::prefix('checkout')->group(function () {
+            Route::post('/preview', [CheckoutController::class, 'preview'])->middleware('throttle:20,1,checkout-preview');
+            Route::post('/', [CheckoutController::class, 'store'])->middleware('throttle:10,1,checkout');
+            Route::get('/{group}', [CheckoutController::class, 'show'])->whereUuid('group')->middleware('throttle:60,1,checkout-show');
         });
 
         // Keranjang belanja: hanya milik pengguna yang login, maksimal 120 permintaan per menit

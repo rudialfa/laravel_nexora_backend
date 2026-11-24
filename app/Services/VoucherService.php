@@ -111,6 +111,62 @@ class VoucherService
 
     // ------------------------------------------------------------ PENGELOLA
 
+    /**
+     * Menilai kode voucher untuk checkout. $untukToko null: harus voucher platform;
+     * selain itu harus voucher milik toko tersebut. $subtotalPerToko: [uuid toko => subtotal barang].
+     *
+     * @param  array<string, int>  $subtotalPerToko
+     * @return array{voucher: Voucher, eligible_subtotal: int, discount: int}
+     *
+     * @throws ValidationException
+     */
+    public function assess(User $user, string $kode, string $field, ?string $untukToko, array $subtotalPerToko): array
+    {
+        $voucher = Voucher::query()->with('store')->where('code', strtoupper(trim($kode)))->first();
+
+        $cocok = $voucher !== null && ($untukToko === null
+            ? $voucher->store_id === null
+            : ($voucher->store !== null && $voucher->store->uuid === $untukToko));
+
+        if (! $cocok || in_array($this->status($voucher), ['inactive', 'scheduled', 'expired'], true)) {
+            $this->reject($field, self::PESAN_TIDAK_VALID);
+        }
+
+        if ($this->status($voucher) === 'exhausted') {
+            $this->reject($field, self::PESAN_KUOTA_HABIS);
+        }
+
+        $dipakai = VoucherUsage::query()
+            ->where('voucher_id', $voucher->id)
+            ->where('user_id', $user->id)
+            ->whereIn('status', ['reserved', 'used'])
+            ->count();
+
+        if ($dipakai >= (int) $voucher->per_user_limit) {
+            $this->reject($field, self::PESAN_BATAS_PENGGUNA);
+        }
+
+        $subtotal = $untukToko === null
+            ? (int) array_sum($subtotalPerToko)
+            : (int) ($subtotalPerToko[$untukToko] ?? 0);
+
+        if ($subtotal <= 0) {
+            $this->reject($field, self::PESAN_KERANJANG_KOSONG);
+        }
+
+        if ($subtotal < (int) $voucher->min_purchase) {
+            $this->reject($field, 'Minimal belanja Rp'.number_format((int) $voucher->min_purchase, 0, ',', '.').' untuk memakai voucher ini.');
+        }
+
+        $diskon = min($subtotal, max(0, (int) $voucher->calculateDiscount($subtotal)));
+
+        if ($diskon <= 0) {
+            $this->reject($field, 'Pembelian belum memenuhi syarat voucher.');
+        }
+
+        return ['voucher' => $voucher, 'eligible_subtotal' => $subtotal, 'discount' => $diskon];
+    }
+
     /** Voucher milik pengelola: platform (storeId null) atau satu toko. Bukan miliknya: 404. */
     public function find(?int $storeId, string $uuid): Voucher
     {
