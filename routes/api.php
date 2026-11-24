@@ -7,6 +7,8 @@ use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\CartController;
+use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\PaymentWebhookController;
 use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\AdminVoucherController;
 use App\Http\Controllers\Api\SellerVoucherController;
@@ -37,6 +39,9 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::prefix('v1')->group(function () {
+    // Notifikasi Midtrans: tanpa login (keamanan dari signature), maksimal 120 permintaan per menit per IP
+    Route::post('/webhooks/midtrans', [PaymentWebhookController::class, 'midtrans'])->middleware('throttle:120,1,midtrans-webhook');
+
 
     // Route publik: untuk mengecek API hidup.
     Route::get('/ping', function () {
@@ -143,6 +148,10 @@ Route::prefix('v1')->group(function () {
             Route::post('/', [CheckoutController::class, 'store'])->middleware('throttle:10,1,checkout');
             Route::get('/{group}', [CheckoutController::class, 'show'])->whereUuid('group')->middleware('throttle:60,1,checkout-show');
         });
+
+        // Pembayaran checkout (Midtrans): virtual account bank atau QRIS
+        Route::post('/checkout/{group}/pay', [PaymentController::class, 'pay'])->whereUuid('group')->middleware('throttle:10,1,payment-create');
+        Route::get('/checkout/{group}/payment', [PaymentController::class, 'show'])->whereUuid('group')->middleware('throttle:60,1,payment-show');
 
         // Keranjang belanja: hanya milik pengguna yang login, maksimal 120 permintaan per menit
         Route::prefix('cart')->middleware('throttle:120,1,cart')->group(function () {
