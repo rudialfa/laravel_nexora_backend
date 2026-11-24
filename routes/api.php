@@ -7,6 +7,8 @@ use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\CartController;
+use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\SellerOrderController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PaymentWebhookController;
 use App\Http\Controllers\Api\CheckoutController;
@@ -152,6 +154,27 @@ Route::prefix('v1')->group(function () {
         // Pembayaran checkout (Midtrans): virtual account bank atau QRIS
         Route::post('/checkout/{group}/pay', [PaymentController::class, 'pay'])->whereUuid('group')->middleware('throttle:10,1,payment-create');
         Route::get('/checkout/{group}/payment', [PaymentController::class, 'show'])->whereUuid('group')->middleware('throttle:60,1,payment-show');
+
+        // Pesanan pembeli: daftar, detail, faktur, batal (sebelum dibayar), dan konfirmasi terima
+        Route::prefix('orders')->middleware('throttle:60,1,orders')->group(function () {
+            Route::get('/', [OrderController::class, 'index']);
+            Route::get('/{order}', [OrderController::class, 'show'])->whereUuid('order');
+            Route::get('/{order}/invoice', [OrderController::class, 'invoice'])->whereUuid('order');
+            Route::post('/{order}/cancel', [OrderController::class, 'cancel'])->whereUuid('order')->middleware('throttle:10,1,order-actions');
+            Route::post('/{order}/complete', [OrderController::class, 'complete'])->whereUuid('order')->middleware('throttle:10,1,order-actions');
+        });
+
+        // Pesanan toko (seller): hanya pesanan yang sudah dibayar milik toko sendiri
+        Route::prefix('seller/orders')->middleware('role:seller')->group(function () {
+            Route::get('/', [SellerOrderController::class, 'index'])->middleware('seller.store');
+            Route::get('/{order}', [SellerOrderController::class, 'show'])->whereUuid('order')->middleware('seller.store');
+
+            Route::middleware(['seller.store:editable', 'throttle:60,1,seller-orders'])->group(function () {
+                Route::post('/{order}/process', [SellerOrderController::class, 'process'])->whereUuid('order');
+                Route::post('/{order}/pack', [SellerOrderController::class, 'pack'])->whereUuid('order');
+                Route::post('/{order}/cancel', [SellerOrderController::class, 'cancel'])->whereUuid('order');
+            });
+        });
 
         // Keranjang belanja: hanya milik pengguna yang login, maksimal 120 permintaan per menit
         Route::prefix('cart')->middleware('throttle:120,1,cart')->group(function () {
