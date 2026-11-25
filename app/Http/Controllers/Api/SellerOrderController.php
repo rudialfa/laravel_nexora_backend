@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Order\CancelOrderRequest;
 use App\Http\Requests\Order\ListOrdersRequest;
+use App\Http\Requests\Order\ShipOrderRequest;
 use App\Models\Store;
 use App\Services\OrderService;
+use App\Services\ShipmentService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,7 +16,10 @@ use Illuminate\Http\Request;
 /** Pesanan toko seller yang login. Pesanan toko lain dan pesanan yang belum dibayar dijawab 404. */
 class SellerOrderController extends Controller
 {
-    public function __construct(private readonly OrderService $orders) {}
+    public function __construct(
+        private readonly OrderService $orders,
+        private readonly ShipmentService $shipments,
+    ) {}
 
     public function index(ListOrdersRequest $request): JsonResponse
     {
@@ -47,9 +52,24 @@ class SellerOrderController extends Controller
         return ApiResponse::success($this->orders->present($hasil, 'seller'), 'Pesanan ditandai sudah dikemas.');
     }
 
+    /** POST /api/v1/seller/orders/{order}/ship: meminta kurir menjemput paket. */
+    public function ship(ShipOrderRequest $request, string $order): JsonResponse
+    {
+        $hasil = $this->shipments->ship($this->toko($request), $order, $request->user(), $request->validated());
+
+        return ApiResponse::success(
+            $this->orders->present($hasil, 'seller'),
+            'Pengiriman dibuat. Kurir akan menjemput sesuai jadwal.',
+            201
+        );
+    }
+
     public function cancel(CancelOrderRequest $request, string $order): JsonResponse
     {
         $hasil = $this->orders->sellerCancel($this->toko($request), $order, $request->user(), $request->validated('reason'));
+
+        // Setelah pesanan benar-benar batal: order Biteship ikut dibatalkan (jika belum dijemput).
+        $this->shipments->cancelBiteship($hasil, $request->validated('reason'));
 
         return ApiResponse::success(
             $this->orders->present($hasil, 'seller'),

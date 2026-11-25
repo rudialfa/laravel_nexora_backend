@@ -7,4 +7,7 @@ return [
 
     // Cadangan jika toko belum memilih kurir. Kode diambil dari dokumentasi Biteship.
     'default_couriers' => array_filter(explode(',', env('BITESHIP_COURIERS', 'jne,sicepat,anteraja'))),
+
+    // Token rahasia untuk webhook Biteship. Tanpa token, semua webhook ditolak.
+    'webhook_token' => env('BITESHIP_WEBHOOK_TOKEN'),
 ];

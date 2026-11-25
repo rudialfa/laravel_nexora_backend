@@ -6,7 +6,9 @@ use App\Http\Controllers\Api\Admin\StoreApplicationController as AdminStoreAppli
 use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandController;
+use App\Http\Controllers\Api\BiteshipWebhookController;
 use App\Http\Controllers\Api\CartController;
+use App\Http\Controllers\Api\TrackingController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\SellerOrderController;
 use App\Http\Controllers\Api\PaymentController;
@@ -41,6 +43,8 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::prefix('v1')->group(function () {
+    // Webhook Biteship: tanpa login (keamanan dari token rahasia), maksimal 120 permintaan per menit per IP
+    Route::post('/webhooks/biteship', [BiteshipWebhookController::class, 'handle'])->middleware('throttle:120,1,biteship-webhook');
     // Notifikasi Midtrans: tanpa login (keamanan dari signature), maksimal 120 permintaan per menit per IP
     Route::post('/webhooks/midtrans', [PaymentWebhookController::class, 'midtrans'])->middleware('throttle:120,1,midtrans-webhook');
 
@@ -175,6 +179,11 @@ Route::prefix('v1')->group(function () {
                 Route::post('/{order}/cancel', [SellerOrderController::class, 'cancel'])->whereUuid('order');
             });
         });
+
+        // Pengiriman: seller meminta kurir, pembeli dan seller melihat pelacakan
+        Route::post('/seller/orders/{order}/ship', [SellerOrderController::class, 'ship'])->whereUuid('order')->middleware(['role:seller', 'seller.store:editable', 'throttle:10,1,seller-ship']);
+        Route::get('/seller/orders/{order}/tracking', [TrackingController::class, 'seller'])->whereUuid('order')->middleware(['role:seller', 'seller.store', 'throttle:60,1,tracking']);
+        Route::get('/orders/{order}/tracking', [TrackingController::class, 'buyer'])->whereUuid('order')->middleware('throttle:60,1,tracking');
 
         // Keranjang belanja: hanya milik pengguna yang login, maksimal 120 permintaan per menit
         Route::prefix('cart')->middleware('throttle:120,1,cart')->group(function () {
