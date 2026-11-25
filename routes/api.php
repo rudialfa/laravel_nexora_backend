@@ -7,7 +7,9 @@ use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\BiteshipWebhookController;
+use App\Http\Controllers\Api\AdminWithdrawalController;
 use App\Http\Controllers\Api\CartController;
+use App\Http\Controllers\Api\SellerFinanceController;
 use App\Http\Controllers\Api\TrackingController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\SellerOrderController;
@@ -184,6 +186,25 @@ Route::prefix('v1')->group(function () {
         Route::post('/seller/orders/{order}/ship', [SellerOrderController::class, 'ship'])->whereUuid('order')->middleware(['role:seller', 'seller.store:editable', 'throttle:10,1,seller-ship']);
         Route::get('/seller/orders/{order}/tracking', [TrackingController::class, 'seller'])->whereUuid('order')->middleware(['role:seller', 'seller.store', 'throttle:60,1,tracking']);
         Route::get('/orders/{order}/tracking', [TrackingController::class, 'buyer'])->whereUuid('order')->middleware('throttle:60,1,tracking');
+
+        // Keuangan seller: saldo, mutasi, penghasilan per pesanan, dan penarikan dana
+        Route::prefix('seller')->middleware(['role:seller', 'throttle:120,1,seller-finance'])->group(function () {
+            Route::get('/wallet', [SellerFinanceController::class, 'wallet'])->middleware('seller.store');
+            Route::get('/wallet/transactions', [SellerFinanceController::class, 'transactions'])->middleware('seller.store');
+            Route::get('/orders/{order}/earnings', [SellerFinanceController::class, 'earnings'])->whereUuid('order')->middleware('seller.store');
+            Route::get('/withdrawals', [SellerFinanceController::class, 'withdrawals'])->middleware('seller.store');
+            Route::get('/withdrawals/{withdrawal}', [SellerFinanceController::class, 'showWithdrawal'])->whereUuid('withdrawal')->middleware('seller.store');
+            Route::post('/withdrawals', [SellerFinanceController::class, 'requestWithdrawal'])->middleware(['seller.store:editable', 'throttle:5,1,seller-withdrawals']);
+        });
+
+        // Peninjauan penarikan dana (admin)
+        Route::prefix('admin/withdrawals')->middleware(['role:admin|super_admin', 'throttle:60,1,admin-withdrawals'])->group(function () {
+            Route::get('/', [AdminWithdrawalController::class, 'index']);
+            Route::get('/{withdrawal}', [AdminWithdrawalController::class, 'show'])->whereUuid('withdrawal');
+            Route::post('/{withdrawal}/approve', [AdminWithdrawalController::class, 'approve'])->whereUuid('withdrawal');
+            Route::post('/{withdrawal}/pay', [AdminWithdrawalController::class, 'pay'])->whereUuid('withdrawal');
+            Route::post('/{withdrawal}/reject', [AdminWithdrawalController::class, 'reject'])->whereUuid('withdrawal');
+        });
 
         // Keranjang belanja: hanya milik pengguna yang login, maksimal 120 permintaan per menit
         Route::prefix('cart')->middleware('throttle:120,1,cart')->group(function () {

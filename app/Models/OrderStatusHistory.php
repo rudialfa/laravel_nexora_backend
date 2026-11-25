@@ -10,6 +10,12 @@ class OrderStatusHistory extends Model
     /** Riwayat tidak pernah diubah, jadi tidak ada updated_at. */
     const UPDATED_AT = null;
 
+    /** Setiap perubahan status pesanan juga menggerakkan dompet toko (dana ditahan, dicairkan, atau dibalik). */
+    protected static function booted(): void
+    {
+        static::created(fn (OrderStatusHistory $riwayat) => app(\App\Services\FinanceService::class)->handleStatusChange($riwayat));
+    }
+
     protected $fillable = [
         'order_id',
         'from_status',

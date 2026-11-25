@@ -78,6 +78,16 @@ class Wallet extends Model
         return $this->mutate([[$bucket, -$amount]], self::TYPE_SALE_REVERSAL, $order);
     }
 
+    public const TYPE_SHIPPING_DIFFERENCE = 'shipping_difference';
+
+    /** Selisih ongkir yang ditanggung penjual: dikurangi dari saldo available (sekali per pesanan). */
+    public function chargeShippingDifference(int $amount, Model $order): bool
+    {
+        $this->requirePositive($amount);
+
+        return $this->mutate([[self::BUCKET_AVAILABLE, -$amount]], self::TYPE_SHIPPING_DIFFERENCE, $order, null, 'Selisih ongkir ditanggung penjual');
+    }
+
     /** Koreksi manual oleh admin (positif menambah, negatif mengurangi). Alasan wajib. */
     public function adjust(int $delta, User $admin, string $description, string $bucket = self::BUCKET_AVAILABLE): bool
     {
