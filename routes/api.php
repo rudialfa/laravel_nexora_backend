@@ -9,6 +9,9 @@ use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\BiteshipWebhookController;
 use App\Http\Controllers\Api\AdminWithdrawalController;
 use App\Http\Controllers\Api\CartController;
+use App\Http\Controllers\Api\QuestionController;
+use App\Http\Controllers\Api\ReviewController;
+use App\Http\Controllers\Api\SellerFeedbackController;
 use App\Http\Controllers\Api\SellerFinanceController;
 use App\Http\Controllers\Api\TrackingController;
 use App\Http\Controllers\Api\OrderController;
@@ -45,6 +48,12 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::prefix('v1')->group(function () {
+    // Ulasan dan tanya jawab publik: tanpa login, maksimal 120 permintaan per menit per IP
+    Route::middleware('throttle:120,1,public-feedback')->group(function () {
+        Route::get('/products/{slug}/reviews', [ReviewController::class, 'productReviews']);
+        Route::get('/products/{slug}/questions', [QuestionController::class, 'index']);
+        Route::get('/stores/{slug}/reviews', [ReviewController::class, 'storeReviews']);
+    });
     // Webhook Biteship: tanpa login (keamanan dari token rahasia), maksimal 120 permintaan per menit per IP
     Route::post('/webhooks/biteship', [BiteshipWebhookController::class, 'handle'])->middleware('throttle:120,1,biteship-webhook');
     // Notifikasi Midtrans: tanpa login (keamanan dari signature), maksimal 120 permintaan per menit per IP
@@ -204,6 +213,20 @@ Route::prefix('v1')->group(function () {
             Route::post('/{withdrawal}/approve', [AdminWithdrawalController::class, 'approve'])->whereUuid('withdrawal');
             Route::post('/{withdrawal}/pay', [AdminWithdrawalController::class, 'pay'])->whereUuid('withdrawal');
             Route::post('/{withdrawal}/reject', [AdminWithdrawalController::class, 'reject'])->whereUuid('withdrawal');
+        });
+
+        // Ulasan dan pertanyaan (pembeli)
+        Route::get('/reviews/pending', [ReviewController::class, 'pending'])->middleware('throttle:60,1,review-pending');
+        Route::post('/orders/{order}/reviews', [ReviewController::class, 'storeProduct'])->whereUuid('order')->middleware('throttle:10,1,review-create');
+        Route::post('/orders/{order}/store-review', [ReviewController::class, 'storeStore'])->whereUuid('order')->middleware('throttle:10,1,review-create');
+        Route::post('/products/{slug}/questions', [QuestionController::class, 'ask'])->middleware('throttle:10,1,question-create');
+
+        // Ulasan dan pertanyaan pada produk toko (seller)
+        Route::prefix('seller')->middleware(['role:seller', 'throttle:60,1,seller-feedback'])->group(function () {
+            Route::get('/reviews', [SellerFeedbackController::class, 'reviews'])->middleware('seller.store');
+            Route::post('/reviews/{review}/reply', [SellerFeedbackController::class, 'reply'])->whereUuid('review')->middleware('seller.store:editable');
+            Route::get('/questions', [SellerFeedbackController::class, 'questions'])->middleware('seller.store');
+            Route::post('/questions/{question}/answer', [SellerFeedbackController::class, 'answer'])->whereUuid('question')->middleware('seller.store:editable');
         });
 
         // Keranjang belanja: hanya milik pengguna yang login, maksimal 120 permintaan per menit
