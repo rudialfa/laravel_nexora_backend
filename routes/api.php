@@ -9,6 +9,8 @@ use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\BiteshipWebhookController;
 use App\Http\Controllers\Api\AdminWithdrawalController;
 use App\Http\Controllers\Api\CartController;
+use App\Http\Controllers\Api\FollowController;
+use App\Http\Controllers\Api\WishlistController;
 use App\Http\Controllers\Api\QuestionController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\SellerFeedbackController;
@@ -228,6 +230,20 @@ Route::prefix('v1')->group(function () {
             Route::get('/questions', [SellerFeedbackController::class, 'questions'])->middleware('seller.store');
             Route::post('/questions/{question}/answer', [SellerFeedbackController::class, 'answer'])->whereUuid('question')->middleware('seller.store:editable');
         });
+
+        // Wishlist pembeli
+        Route::prefix('wishlist')->middleware('throttle:120,1,wishlist')->group(function () {
+            Route::get('/', [WishlistController::class, 'index']);
+            Route::get('/check', [WishlistController::class, 'check']);
+            Route::post('/', [WishlistController::class, 'store'])->middleware('throttle:30,1,wishlist-write');
+            Route::delete('/{product}', [WishlistController::class, 'destroy'])->whereUuid('product')->middleware('throttle:30,1,wishlist-write');
+        });
+
+        // Mengikuti toko: pembeli mengikuti dan melihat daftar, seller melihat pengikutnya
+        Route::post('/stores/{slug}/follow', [FollowController::class, 'follow'])->middleware('throttle:30,1,follow-write');
+        Route::delete('/stores/{slug}/follow', [FollowController::class, 'unfollow'])->middleware('throttle:30,1,follow-write');
+        Route::get('/following', [FollowController::class, 'following'])->middleware('throttle:60,1,following');
+        Route::get('/seller/followers', [FollowController::class, 'followers'])->middleware(['role:seller', 'seller.store', 'throttle:60,1,seller-followers']);
 
         // Keranjang belanja: hanya milik pengguna yang login, maksimal 120 permintaan per menit
         Route::prefix('cart')->middleware('throttle:120,1,cart')->group(function () {
