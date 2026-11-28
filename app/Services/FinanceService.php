@@ -218,9 +218,20 @@ class FinanceService
     {
         $ditahan = $this->jumlahTertahan($wallet, $order);
 
-        if ($ditahan !== null && $ditahan > 0) {
+        if ($ditahan !== null && $ditahan > 0 && ! $this->sudahDicairkan($wallet, $order)) {
             $wallet->reverseSale($ditahan, $order, Wallet::BUCKET_PENDING);
         }
+    }
+
+    /** Dana pesanan ini sudah dicairkan (misalnya oleh penyelesaian komplain): tidak dibalik lagi. */
+    private function sudahDicairkan(Wallet $wallet, Order $order): bool
+    {
+        return WalletTransaction::query()
+            ->where('wallet_id', $wallet->id)
+            ->where('type', Wallet::TYPE_SALE_RELEASE)
+            ->where('reference_type', $order->getMorphClass())
+            ->where('reference_id', $order->getKey())
+            ->exists();
     }
 
     private function jumlahTertahan(Wallet $wallet, Order $order): ?int

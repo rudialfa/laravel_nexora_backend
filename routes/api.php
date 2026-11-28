@@ -8,7 +8,10 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\BiteshipWebhookController;
 use App\Http\Controllers\Api\AdminWithdrawalController;
+use App\Http\Controllers\Api\AdminDisputeController;
 use App\Http\Controllers\Api\CartController;
+use App\Http\Controllers\Api\DisputeController;
+use App\Http\Controllers\Api\SellerDisputeController;
 use App\Http\Controllers\Api\FollowController;
 use App\Http\Controllers\Api\WishlistController;
 use App\Http\Controllers\Api\QuestionController;
@@ -244,6 +247,31 @@ Route::prefix('v1')->group(function () {
         Route::delete('/stores/{slug}/follow', [FollowController::class, 'unfollow'])->middleware('throttle:30,1,follow-write');
         Route::get('/following', [FollowController::class, 'following'])->middleware('throttle:60,1,following');
         Route::get('/seller/followers', [FollowController::class, 'followers'])->middleware(['role:seller', 'seller.store', 'throttle:60,1,seller-followers']);
+
+        // Komplain pembeli
+        Route::post('/orders/{order}/dispute', [DisputeController::class, 'store'])->whereUuid('order')->middleware('throttle:5,1,dispute-create');
+        Route::get('/disputes', [DisputeController::class, 'index'])->middleware('throttle:60,1,disputes');
+        Route::get('/disputes/{dispute}', [DisputeController::class, 'show'])->whereUuid('dispute')->middleware('throttle:60,1,disputes');
+
+        // Komplain pada pesanan toko (seller)
+        Route::prefix('seller/disputes')->middleware(['role:seller', 'throttle:60,1,seller-disputes'])->group(function () {
+            Route::get('/', [SellerDisputeController::class, 'index'])->middleware('seller.store');
+            Route::get('/{dispute}', [SellerDisputeController::class, 'show'])->whereUuid('dispute')->middleware('seller.store');
+            Route::post('/{dispute}/respond', [SellerDisputeController::class, 'respond'])->whereUuid('dispute')->middleware('seller.store:editable');
+        });
+
+        // Keputusan komplain dan pengembalian dana (admin)
+        Route::prefix('admin')->middleware(['role:admin|super_admin', 'throttle:60,1,admin-disputes'])->group(function () {
+            Route::get('/disputes', [AdminDisputeController::class, 'index']);
+            Route::get('/disputes/{dispute}', [AdminDisputeController::class, 'show'])->whereUuid('dispute');
+            Route::post('/disputes/{dispute}/review', [AdminDisputeController::class, 'review'])->whereUuid('dispute');
+            Route::post('/disputes/{dispute}/approve', [AdminDisputeController::class, 'approve'])->whereUuid('dispute');
+            Route::post('/disputes/{dispute}/reject', [AdminDisputeController::class, 'reject'])->whereUuid('dispute');
+            Route::post('/disputes/{dispute}/refund', [AdminDisputeController::class, 'retryRefund'])->whereUuid('dispute');
+            Route::get('/refunds', [AdminDisputeController::class, 'refunds']);
+            Route::post('/refunds/{refund}/complete', [AdminDisputeController::class, 'completeRefund'])->whereUuid('refund');
+            Route::post('/refunds/{refund}/fail', [AdminDisputeController::class, 'failRefund'])->whereUuid('refund');
+        });
 
         // Keranjang belanja: hanya milik pengguna yang login, maksimal 120 permintaan per menit
         Route::prefix('cart')->middleware('throttle:120,1,cart')->group(function () {
